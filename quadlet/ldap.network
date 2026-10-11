@@ -1,0 +1,4 @@
+[Network]
+NetworkName=ldap
+# Nothing in this stack needs the internet.
+Internal=true

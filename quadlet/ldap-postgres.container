@@ -1,0 +1,46 @@
+[Unit]
+Description=ldap: postgres
+PartOf=ldap.service
+Before=ldap.service
+
+[Container]
+Image=docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+ContainerName=ldap-postgres
+# Runs as postgres (70) from the start: no root phase, no capability.  The
+# data directory belongs to the mapped uid 70 (README: podman unshare chown).
+User=70
+Group=70
+DropCapability=ALL
+NoNewPrivileges=true
+SeccompProfile=/etc/containers/seccomp/rootless-stack.json
+ReadOnly=true
+Tmpfs=/run/postgresql:mode=3777,size=1m,noexec
+Tmpfs=/tmp:mode=1777,size=64m,noexec
+Memory=256m
+Network=ldap.network
+NetworkAlias=postgres
+Volume=%h/data/postgres:/var/lib/postgresql:Z
+Volume=%h/secrets/postgres_password:/run/secrets/postgres_password:ro,Z
+Environment=POSTGRES_DB=lldap
+Environment=POSTGRES_USER=lldap
+Environment=POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+HealthCmd=pg_isready -U lldap
+HealthStartupCmd=pg_isready -U lldap
+HealthStartupInterval=3s
+HealthStartupSuccess=1
+HealthStartupRetries=0
+HealthStartupTimeout=5s
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+Notify=healthy
+HealthOnFailure=kill
+StopTimeout=60
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=ldap.service

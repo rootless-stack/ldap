@@ -1,0 +1,42 @@
+[Unit]
+Description=ldap: socket relay for lldap
+PartOf=ldap.service
+Before=ldap.service
+After=ldap-lldap.service
+
+[Container]
+Image=docker.io/library/haproxy:3.4-alpine@sha256:7af8255207ee9964ccb4eec8ce4b7a40b777769665e3ae83897fb01b24d8a43a
+ContainerName=ldap-relay
+# keep-id: HAProxy runs as the ldap-svc user itself, so the sockets it
+# binds belong to the owner of /run/rootless-ipc/lldap.
+UserNS=keep-id:uid=99,gid=99
+User=99
+Group=99
+DropCapability=ALL
+NoNewPrivileges=true
+SeccompProfile=/etc/containers/seccomp/rootless-stack.json
+ReadOnly=true
+Memory=64m
+Network=ldap.network
+Volume=/run/rootless-ipc/lldap:/run/rootless-ipc/lldap:z
+Volume=%h/config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro,Z
+StopSignal=SIGTERM
+HealthCmd=["test", "-S", "/run/rootless-ipc/lldap/http/http.sock"]
+HealthStartupCmd=["test", "-S", "/run/rootless-ipc/lldap/http/http.sock"]
+HealthStartupInterval=3s
+HealthStartupSuccess=1
+HealthStartupRetries=0
+HealthStartupTimeout=5s
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+Notify=healthy
+HealthOnFailure=kill
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStartSec=120
+
+[Install]
+WantedBy=ldap.service

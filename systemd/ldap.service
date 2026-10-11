@@ -1,0 +1,14 @@
+[Unit]
+Description=rootless-stack: ldap
+# The stack's anchor.  Every container unit is WantedBy=, Before= and
+# PartOf= it: `start` returns once each container is healthy, and `stop` /
+# `restart` reach them all.  Never RequiredBy=: Requires= would propagate
+# one container's restart to the whole stack.
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+[Install]
+WantedBy=default.target

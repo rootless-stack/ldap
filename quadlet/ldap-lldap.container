@@ -1,0 +1,68 @@
+[Unit]
+Description=ldap: lldap
+PartOf=ldap.service
+Before=ldap.service
+Requires=ldap-postgres.service
+After=ldap-postgres.service
+
+[Container]
+Image=docker.io/lldap/lldap:v0.6@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
+ContainerName=ldap-lldap
+# The image's entrypoint changes users and writes into the image; run the
+# binary directly as its own user instead.
+Entrypoint=/app/lldap
+Exec=run
+User=1000
+Group=1000
+DropCapability=ALL
+NoNewPrivileges=true
+SeccompProfile=/etc/containers/seccomp/rootless-stack.json
+ReadOnly=true
+Tmpfs=/tmp:mode=1777,size=16m,noexec
+Memory=128m
+# No published port: lldap is reachable only on the internal ldap network,
+# and from outside the stack only through ldap-relay's sockets.
+Network=ldap.network
+NetworkAlias=lldap
+# No config file and no /data: everything comes from LLDAP_* variables, and
+# the server key is derived from LLDAP_KEY_SEED, so lldap keeps no state
+# outside postgres.  Changing the seed invalidates every password.
+Volume=%h/secrets/lldap_admin_password:/run/secrets/lldap_admin_password:ro,Z
+Volume=%h/secrets/lldap_jwt_secret:/run/secrets/lldap_jwt_secret:ro,Z
+Volume=%h/secrets/lldap_key_seed:/run/secrets/lldap_key_seed:ro,Z
+Volume=%h/secrets/lldap_database_url:/run/secrets/lldap_database_url:ro,Z
+# LLDAP_LDAP_BASE_DN and any other non-secret LLDAP_* setting.
+EnvironmentFile=%h/config/env
+# lldap reads LLDAP_<KEY>_FILE for any key, so no secret is an env value.
+Environment=LLDAP_JWT_SECRET_FILE=/run/secrets/lldap_jwt_secret
+Environment=LLDAP_LDAP_USER_PASS_FILE=/run/secrets/lldap_admin_password
+Environment=LLDAP_KEY_SEED_FILE=/run/secrets/lldap_key_seed
+Environment=LLDAP_KEY_FILE=
+Environment=LLDAP_DATABASE_URL_FILE=/run/secrets/lldap_database_url
+Environment=LLDAP_HTTP_PORT=17170
+Environment=LLDAP_LDAP_PORT=3890
+# cwd-relative by default; the image is read-only.
+WorkingDir=/tmp
+Environment=LLDAP_ASSETS_PATH=/app/app
+# SIGTERM waits for every open LDAP connection (consumers hold theirs
+# open) and runs into the stop timeout; SIGINT exits at once.
+StopSignal=SIGINT
+HealthCmd=["/app/lldap", "healthcheck"]
+HealthStartupCmd=["/app/lldap", "healthcheck"]
+HealthStartupInterval=3s
+HealthStartupSuccess=1
+HealthStartupRetries=0
+HealthStartupTimeout=5s
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+Notify=healthy
+HealthOnFailure=kill
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=ldap.service
