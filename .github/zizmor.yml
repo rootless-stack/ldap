@@ -1,0 +1,8 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # The org's own reusable workflows: same trust boundary, and @main
+        # lets a fix reach every stack at once.  Everything else: hash pins.
+        "rootless-stack/*": ref-pin
+        "*": hash-pin

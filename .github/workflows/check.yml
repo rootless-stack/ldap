@@ -1,0 +1,39 @@
+# What this stack ships, checked by the programs that will read it:
+# - the units, through the Quadlet generator of the oldest podman the
+#   stacks support (base README);
+# - the relay's haproxy.cfg, by haproxy -c in the very image ldap-relay
+#   pins, with `lldap` resolving as it does on the stack's network.
+name: check
+
+on:
+  push:
+    branches: [main]
+    paths: [quadlet/**, config/**, .github/workflows/check.yml]
+  pull_request:
+    paths: [quadlet/**, config/**, .github/workflows/check.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Raise together with the podman version in base's README.
+  PODMAN: quay.io/podman/stable:v5.5@sha256:25d49cf990843962043942db172c7ef5c6f85012384aada7976aec65906ae209
+
+jobs:
+  check:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Generate the units
+        run: |
+          podman run --rm -v "$PWD/quadlet:/units:ro" -e QUADLET_UNIT_DIRS=/units \
+            "$PODMAN" /usr/libexec/podman/quadlet -dryrun -user >/dev/null
+      - name: Check the relay's haproxy.cfg
+        run: |
+          set -euo pipefail
+          image=$(sed -n 's/^Image=//p' quadlet/ldap-relay.container)
+          podman run --rm --add-host lldap:127.0.0.1 -v "$PWD/config:/c:ro" \
+            "$image" haproxy -c -f /c/haproxy.cfg
